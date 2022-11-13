@@ -15,15 +15,15 @@ Some of these datasets have been shared in this repository, under [Sensor-Trust-
 
 The folder is structured in the following way (according to the data produced for the paper published and to the data resulting from the research done for the PhD):
 
-.
+    .
     ├── PhD Results                   # Results from PhD research analysis and validation
     │   ├──Arduino                  
     │   ├──Injected Errors
     │   ├──Puertos del Estado
     │   ├──Toolbox
-    │   ├──Validation
-    │   │  ├──Gyor
-    │   │  ├──SensorScope
+    │   └──Validation
+    │      ├──Gyor
+    │      └──SensorScope
     ├── Sensors Paper Results         # Results obtained when preparing the paper published in the Sensors journal    
     ├── LICENSE
     └── README.md
@@ -32,13 +32,7 @@ The folder is structured in the following way (according to the data produced fo
 
 This work has been done by:
 
-Francisco Javier Nieto
-
-[Mail](mailto:fjavier.nieto@opendeusto.es)
-
-[fjaviernieto](https://github.com/fjaviernieto)
-
-[@BrkfstResearch](https://twitter.com/BrkfstResearch)
+Francisco Javier Nieto ([Mail](mailto:fjavier.nieto@opendeusto.es) | [fjaviernieto](https://github.com/fjaviernieto) | [@BrkfstResearch](https://twitter.com/BrkfstResearch))
 
 ## License
 
