@@ -36,7 +36,7 @@ Francisco Javier Nieto ([Mail](mailto:fjavier.nieto@opendeusto.es) | [fjaviernie
 
 ## License
 
-These datasets are licensed under the Attribution NonCommercial-NoDerivs CC BY-NC-ND License (CC BY-NC-ND 4.0) - see the LICENSE.md file for details
+These datasets are licensed under the Attribution NonCommercial-NoDerivs CC BY-NC-ND License (CC BY-NC-ND 4.0) - see the LICENSE file for details
 
 ## Reference this Work
 
