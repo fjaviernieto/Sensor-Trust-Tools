@@ -39,11 +39,11 @@ correlation_analysis <- function (sensorData1, sensorData2, outliers) {
   
   # Check normality of the data with Shapiro-Wilk
   normalityTest1 <- shapiro.test(sensorData1)
-  print(normalityTest1)
+  #print(normalityTest1)
   
   # Check normality of the data with Anderson-Darling
   normalityTest2 <- ad.test(sensorData1)
-  print(normalityTest2)
+  #print(normalityTest2)
   
   dataDistribution <- "NORMAL"
   # Normality consensus and calculate mean and variance
@@ -54,35 +54,32 @@ correlation_analysis <- function (sensorData1, sensorData2, outliers) {
   outSpearman <- NaN
   
   if (normalityTest1$p.value<0.05 | normalityTest2$p.value<0.05) {
-    print("The tests reported the dataset is not normal.")
+    #print("The tests reported the dataset is not normal.")
     normalityAgreed <- FALSE
   } else if (!outliers) {
-    print("The tests reported the dataset is normal. Calculate Pearson")
+    #print("The tests reported the dataset is normal. Calculate Pearson")
     outPearson <- cor.test(sensorData1, sensorData2, method="pearson")
     estPearson <- getElement(outPearson, "estimate")[[1]]
-    print(outPearson)
+    #print(outPearson)
   }
   
   # Correlation with Kendall
   outKendall <- cor.test(sensorData1, sensorData2, method="kendall")
   estKendall <- getElement(outKendall, "estimate")[[1]]
-  print(outKendall)
+  #print(outKendall)
   
   # Correlation with Spearman
   outSpearman <- cor.test(sensorData1, sensorData2, method="spearman")
   estSpearman <- getElement(outSpearman, "estimate")[[1]]
-  print(outSpearman)
+  #print(outSpearman)
   
   # Check if the tests reported correlation
   haveCorrelation <- FALSE
   corrText <- "NoCorrelated"
   if (estKendall >= 0.5 | estSpearman >= 0.5) {
-    print("There is correlation between the datasets!")
+    #print("There is correlation between the datasets!")
     haveCorrelation <- TRUE
     corrText <- "YesCorrelated"
-  #} else if (!is.nan(outPearson) & outPearson$estimate >= 0.5) {
-  #  print("There is correlation between the datasets!")
-  #  haveCorrelation <- TRUE
   }
   
   # Prepare result of the function
@@ -106,6 +103,7 @@ plot(sensorDataFull1, col="green", main="Full dataset")
 sensorDataFull2 <- fullDataset2[,5]
 plot(sensorDataFull2, col="green", main="Full dataset")
 
+system.time({
 # See full correlation
 resultDataFull <- correlation_analysis(sensorDataFull1[1:4999], sensorDataFull2[1:4999], outliersExpected)
 
@@ -117,14 +115,16 @@ referenceIndexesLong
 
 # Set up the parallel environment PSOCK cluster, so it can be used in Windows and Linux
 defaultCores <- detectCores()-1
+defaultCores <- 7
 defaultCores
 myCluster <- makeCluster(defaultCores, type = "PSOCK")
 myCluster
 registerDoParallel(cl=myCluster)
+#})
 
 # Iterate through the data chunks with long windows
-system.time({
-  fullResult <- foreach (i=1:12, .combine = 'cbind', .packages=c("nortest", "foreach")) %do% {
+#system.time({
+  fullResult <- foreach (i=1:12, .combine = 'cbind', .packages=c("nortest", "foreach")) %dopar% {
     currentIndex <- referenceIndexesLong[i]
     
     # Prepare the sliding windows (50 steps)
@@ -155,13 +155,63 @@ system.time({
     #partialResult
     
   }
-})
+#})
 
+#system.time({
 # Save the results to a CSV file
 dfSave <- data.frame(matrix(unlist(fullResult[,1:600]), nrow=600, byrow=TRUE),stringsAsFactors=FALSE)
 colnames(dfSave) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", 
                       "correlation", "cortext", "kendall", "spearman", "pearson")
-write.table(dfSave, file="C:/PhD/correlationProcess.csv", append= T, sep=',')
+write.table(dfSave, file="C:/PhD/correlationProcessLong.csv", append= T, sep=',')
 
 stopImplicitCluster()
+
+# Define the short data chunks with sliding windows of 15 steps
+shortWindowLength <- round (numMetrics*0.01, 0)
+referenceIndexesShort <- sample (shortWindowLength:numMetrics,15,replace=F)
+referenceIndexesShort
+#})
+
+# Iterate through the data chunks with short windows
+#system.time({
+  fullResultShort <- foreach (i=1:15, .combine = 'cbind', .packages=c("nortest", "foreach")) %dopar% {
+    currentIndex <- referenceIndexesShort[i]
+    
+    # Prepare the sliding windows (15 steps)
+    partialResult <- foreach (j=1:15, .combine = 'cbind') %do% {
+      initialIndex <- currentIndex+j-1-shortWindowLength+j-1
+      finalIndex <- currentIndex+j-1
+      sensorDataChunk1 <- sensorDataFull1 [initialIndex:finalIndex] 
+      sensorDataChunk2 <- sensorDataFull2 [initialIndex:finalIndex]
+      resultSlidingWindow <- correlation_analysis(sensorDataChunk1, sensorDataChunk2, outliersExpected)
+      
+      # Extract results for outcome preparation
+      shapiroVal <- getElement(resultSlidingWindow, "shapiro")
+      adVal <- getElement(resultSlidingWindow, "ad")
+      normalityAgreed <- getElement(resultSlidingWindow, "normality")
+      haveCorrelation <- getElement(resultSlidingWindow, "correlation")
+      corrText <- getElement(resultSlidingWindow, "cortext")
+      estKendall <- getElement(resultSlidingWindow, "kendall")
+      estSpearman <- getElement(resultSlidingWindow, "spearman")
+      estPearson <- getElement(resultSlidingWindow, "pearson")
+      
+      # Leave the results in a list, in memory, for combination with the other loops results
+      myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex, 
+                               "shapiro" = shapiroVal, "ad" = adVal, 
+                               "normality" = normalityAgreed, "correlation" = haveCorrelation, "cortext" = corrText,
+                               "kendall" = estKendall, "spearman" = estSpearman, "pearson" = estPearson)
+    }
+  }
+#})
+
+#system.time({
+stopImplicitCluster()
+
+# Save the results to a CSV file
+dfSave2 <- data.frame(matrix(unlist(fullResultShort[,1:225]), nrow=225, byrow=TRUE),stringsAsFactors=FALSE)
+colnames(dfSave2) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", 
+                      "correlation", "cortext", "kendall", "spearman", "pearson")
+write.table(dfSave2, file="C:/PhD/correlationProcessShort.csv", append= T, sep=',')
+
+})
 

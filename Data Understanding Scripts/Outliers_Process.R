@@ -33,14 +33,14 @@ library(doParallel)
 # Configuration parameters #
 ############################
 
-inputFile <- 'C:/PhD/bosch_sensor_1.csv'
+inputFile <- 'C:/PhD/Arduino/station_arduino.csv'
 
 # Function that calculates all the tests --> So its execution can be parallelized
 outliers_analysis <- function (sensorData) {
   
   # Remove NA values (or SNHT fails) --> Consider as outlier 
   sensorData[is.na(sensorData)] <- -99.99
-  plot(sensorData, col="green")
+  #plot(sensorData, col="green")
   
   # Check whether there is strong trend in the data or not
   outMk = mk.test(sensorData)
@@ -141,10 +141,10 @@ outliers_analysis <- function (sensorData) {
 fullDataset <- read.csv(inputFile, sep = ",", header = TRUE)
 
 # Extract the data we are interested in and plot the full dataset
-sensorDataFull <- fullDataset[,5]
+sensorDataFull <- fullDataset[,3]
 sensorDataFull[is.na(sensorDataFull)] <- -99.99
 plot(sensorDataFull, col="green", main="Full dataset")
-
+t1 <- system.time({
 # Define the long data chunks with sliding windows of 50 steps
 numMetrics <- length(sensorDataFull)
 longWindowLength <- round (numMetrics*0.06, 0)
@@ -152,14 +152,16 @@ referenceIndexesLong <- sample (longWindowLength:numMetrics,12,replace=F)
 referenceIndexesLong
 
 # Set up the parallel environment PSOCK cluster, so it can be used in Windows and Linux
-defaultCores <- detectCores()-1
+#defaultCores <- detectCores()-1
+defaultCores <- 4
 defaultCores
 myCluster <- makeCluster(defaultCores, type = "PSOCK")
 myCluster
 registerDoParallel(cl=myCluster)
+})
 
 # Iterate through the data chunks with long windows
-system.time({
+t2 <- system.time({
   fullResultLong <- foreach (i=1:10, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", "EnvStats")) %dopar% {
     currentIndex <- referenceIndexesLong[i]
     
@@ -196,6 +198,7 @@ system.time({
   }
 })
 
+t3 <- system.time({
 stopImplicitCluster()
 
 # Save the results to a CSV file
@@ -210,12 +213,13 @@ myCluster
 registerDoParallel(cl=myCluster)
 
 # Define the short data chunks with sliding windows of 15 steps
-shortWindowLength <- round (numMetrics*0.025, 0)
+shortWindowLength <- round (numMetrics*0.01, 0)
 referenceIndexesShort <- sample (shortWindowLength:numMetrics,15,replace=F)
 referenceIndexesShort
+})
 
-# Iterate through the data chunks with long windows
-system.time({
+# Iterate through the data chunks with short windows
+t4 <- system.time({
   fullResultShort <- foreach (i=1:15, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", "EnvStats")) %dopar% {
     currentIndex <- referenceIndexesShort[i]
     
@@ -252,6 +256,7 @@ system.time({
   }
 })
 
+t5 <- system.time({
 stopImplicitCluster()
 
 # Save the results to a CSV file
@@ -259,3 +264,4 @@ dfSave2 <- data.frame(matrix(unlist(fullResultShort[,1:225]), nrow=225, byrow=TR
 colnames(dfSave2) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers", 
                       "snht", "grubbs", "pettitt", "lanzante", "buishandU", "buishandRange")
 write.table(dfSave2, file="C:/PhD/outliersProcessShort.csv", append= T, sep=',')
+})

@@ -1,7 +1,7 @@
 ########################################################################################
 ## Script for automating the process of variation analysis
 ## -------------------------------------------------------------------------------------
-## Copyright (c) 2021 F. Javier Nieto. All rights reserved.
+## Copyright (c) 2022 F. Javier Nieto. All rights reserved.
 ## This file is part of my PhD work.
 ##
 ## This script is free software: you can redistribute it and/or modify it
@@ -34,45 +34,75 @@ library(doParallel)
 ############################
 
 absoluteZero <- TRUE
-inputFile <- 'C:/PhD/bosch_sensor_1.csv'
+# inputFile <- 'C:/PhD/Arduino/station_arduino.csv'
+# inputFile <- 'C:/PhD/HiDALGO_Bosch/1WeekAirQualityBosch.csv'
+inputFile <- 'C:/PhD/Movil Toolbox/Luminosity_log_2020-07-15_night_indoor_corrected.csv'
 
 
 # Function that looks for the best distribution fitting the current dataset
 distribution_fit <- function (sensorData) {
   
-  # If there are avalues below 0, we move the dataset up --> Necessary for weibull, gamma...
+  # If there are values below 0, we move the dataset up --> Necessary for weibull, gamma...
   minValue <- min(sensorData)
   if (minValue<0) {
     sensorData <- sensorData + ((minValue*-1) +1)
   }
+  # Initialize AIC and BIC lists
+  aicList <- c(9999, 9999, 9999, 9999, 9999)
+  bicList <- c(9999, 9999, 9999, 9999, 9999)
   
-  # Calculate fit for 3 distributions: weibull, lognormal, gamma
+  # Select the fitdist with mge in case the standard (mle) gives an error in the optimization
+  # Calculate fit for 5 distributions: weibull, lognormal, gamma, normal and uniform
+  # fweibull <- fitdist(sensorData, "weibull", method="mge")
   fweibull <- fitdist(sensorData, "weibull")
+  if (!is.null(fweibull)) {
+    # print(paste("Weibull AIC: ", fweibull$aic))
+    # print(paste("Weibull BIC: ", fweibull$bic))
+    aicList[1] <- fweibull$aic
+    bicList[1] <- fweibull$bic
+  }
+        
+  # fgamma <- fitdist(sensorData, "gamma", method="mge")
   fgamma <- fitdist(sensorData, "gamma")
+  if (!is.null(fgamma)) {  
+    # print(paste("Gamma AIC: ", fgamma$aic))
+    # print(paste("Gamma BIC: ", fgamma$bic))
+    aicList[2] <- fgamma$aic
+    bicList[2] <- fgamma$bic
+  }
+  
+  # flnorm <- fitdist(sensorData, "lnorm", method="mge")
   flnorm <- fitdist(sensorData, "lnorm")
+  if (!is.null(flnorm)) {
+    # print(paste("Lnorm AIC: ", flnorm$aic))
+    # print(paste("Lnorm BIC: ", flnorm$bic))
+    aicList[3] <- flnorm$aic
+    bicList[3] <- flnorm$bic
+  }
+     
+  # fnorm <- fitdist(sensorData, "norm", method="mge")
   fnorm <- fitdist(sensorData, "norm")
+  if (!is.null(fnorm)) {
+    # print(paste("Norm AIC: ", fnorm$aic))
+    # print(paste("Norm BIC: ", fnorm$bic))
+    aicList[4] <- fnorm$aic
+    bicList[4] <- fnorm$bic
+  }
+  
+  # funif <- fitdist(sensorData, "unif", method="mge")
   funif <- fitdist(sensorData, "unif")
-  #fburr <- fitdist(sensorData, "burr", start = list(shape1 = 0.3, shape2 = 1, rate = 1)) #issues with 'actuar' library
+  if (!is.null(funif)) {
+    # print(paste("Unif AIC: ", funif$aic))
+    # print(paste("Unif BIC: ", funif$bic))
+    aicList[5] <- funif$aic
+    bicList[5] <- funif$bic
+  }
   
-  #cdfcomp(list(fweibull, fgamma, flnorm, fnorm, funif), 
-  #        xlogscale = TRUE, ylogscale = TRUE, legendtext = c("weibull", "gamma", "lognormal", "normal", "unif"))
-  
-  # Compare the goodness of fit for all the distributions 
-  gofResult <- gofstat(list(fweibull, fgamma, flnorm, fnorm, funif), fitnames = c("weibull", "gamma", "lnorm", "normal", "unif"))
-  aicList <- c(gofResult$aic[[1]], gofResult$aic[[2]], gofResult$aic[[3]], gofResult$aic[[4]], gofResult$aic[[5]])
-  bicList <- c(gofResult$bic[[1]], gofResult$bic[[2]], gofResult$bic[[3]], gofResult$bic[[4]], gofResult$bic[[5]])
-  ksList <- c(gofResult$ks[[1]], gofResult$ks[[2]], gofResult$ks[[3]],gofResult$ks[[4]], gofResult$ks[[5]])
-  cvmList <- c(gofResult$cvm[[1]], gofResult$cvm[[2]], gofResult$cvm[[3]], gofResult$cvm[[4]], gofResult$cvm[[5]])
-  adList <- c(gofResult$ad[[1]], gofResult$ad[[2]], gofResult$ad[[3]], gofResult$ad[[4]], gofResult$ad[[5]])
-  fullGofList <- list(aicList, bicList, ksList, cvmList, adList)
+  fullGofList <- aicList + bicList
   
   # Revise the results and indicate the one with best fit
-  resGofList <- c(0, 0, 0, 0, 0)
-  for (i in 1:5) {
-    resGofList[which.min(fullGofList[[i]])] <- resGofList[which.min(fullGofList[[i]])]+1
-  }
-  bestGofFit <- which.max(resGofList)
-  distributionResult <- switch(bestGofFit, '1' = {fweibull}, '2' = {fgamma}, '3' = {flnorm}, '4' = {fnorm}, '5' = {funif})
+  bestGofFit <- which.min(fullGofList)
+  distributionResult <- switch(bestGofFit, '1' = {"weibull"}, '2' = {"gamma"}, '3' = {"lnorm"}, '4' = {"norm"}, '5' = {"unif"})
   return (distributionResult)
 }
 
@@ -82,92 +112,110 @@ variation_analysis <- function (sensorData, iteration, abZero) {
   
     # Create a plot with the data 
   title <- paste ("Iteration", iteration)
-  plot(sensorData, col="green", main=title)
+  #plot(sensorData, col="green", main=title)
+  #print(title)
   
   # Calculate coefficient of variation
-  coefVar <- NaN
+  # coefVar <- NaN
+  coefVar <- -100
   if (abZero) {
     coefVar <- cv(sensorData)
   }
+  #print(paste("coefVar: ", coefVar))
   
-  # Check normality of the data with Shapiro-Wilk
-  normalityTest1 <- shapiro.test(sensorData)
-  shapiroValue <- getElement(normalityTest1, "p.value")
-  #print(normalityTest1)
+  # Check normality of the data 
+  shapiroValue <- NaN
+  adValue <- NaN
+  runsVal <- NaN
+  boxVal <- NaN
+  # Bear in mind that, if all values are equal, the tests fail
+  if (length(unique(sensorData))!=1) {
+    # Check normality of the data with Shapiro-Wilk
+    normalityTest1 <- shapiro.test(sensorData)
+    shapiroValue <- getElement(normalityTest1, "p.value")
+    
+    # Check normality of the data with Anderson-Darling
+    normalityTest2 <- ad.test(sensorData)
+    adValue <- getElement(normalityTest2, "p.value")
+    
+    # Check if we have random data
+    # Runs test with mean as reference (median can be used)
+    myThreshold <- mean(sensorData)
+    outRuns = runs.test(sensorData, threshold = myThreshold)
+    runsVal <- getElement(outRuns, "p.value")
+    
+    # Ljung-Box test (autocorrelation test that gives idea about white noise time-series)
+    outBox = Box.test(sensorData, lag = 1, type = "Ljung")
+    boxVal <- getElement(outBox, "p.value")
+    # print(outBox)
+    
+  }
+  #print(paste("Shapiro: ", shapiroValue))
+  #print(paste("AD: ", adValue))
+  #print(paste("Runs: ", runsVal))
   
-  # Check normality of the data with Anderson-Darling
-  normalityTest2 <- ad.test(sensorData)
-  adValue <- getElement(normalityTest2, "p.value")
-  #print(normalityTest2)
-  
-  dataDistribution <- "NORMAL"
   # Normality consensus and calculate mean and variance
   normalityAgreed <- TRUE
   bestFit <- NaN
-  bestFitName <- NaN
-  if (normalityTest1$p.value<0.05 | normalityTest2$p.value<0.05) {
-    #print("The tests reported the dataset is not normal.")
+  bestFitName <- "None"
+  #print("Determining distribution...")
+  if (is.nan(shapiroValue) | is.nan(adValue)) {
     normalityAgreed <- FALSE
-    
-    # Calculate best fit of the dataset for 3 distributions: weibull, lognormal, gamma
-    bestFit <- distribution_fit(sensorData)
-    bestFitName <- getElement(bestFit, "distname")
-    
+    bestFitName <- "one-point"
+    #print(paste("Distr: ", bestFitName))
+  } else if (shapiroValue<0.05 | adValue<0.05) {
+    normalityAgreed <- FALSE
+    # Calculate best fit of the dataset for 5 distributions: weibull, lognormal, gamma, normal, uniform
+    bestFitName <- distribution_fit(sensorData)
   } else {
-    #print("The tests reported the dataset is normal.")
+    bestFitName <- "norm"
   }
   
-  # Ljung-Box test
-  outBox = Box.test(sensorData, lag = 1, type = "Ljung")
-  #print(outBox)
+  # print(paste("Distr: ", bestFitName))
   
-  # Runs test with mean as reference (median can be used)
-  myThreshold <- mean(sensorData)
-  outRuns = runs.test(sensorData, threshold = myThreshold)
-  runsVal <- getElement(outRuns, "p.value")
-  #print(outRuns)
-  randomData <- TRUE
-  if (outRuns$p.value < 0.05) {
-    randomData <- FALSE
-  }
+  # randomData <- FALSE
+  # if (outRuns$p.value > 0.05) {
+  #   randomData <- TRUE
+  # }
   
   # Calculate quartiles and IQR
-  outQuantile=quantile(sensorData)
+  # outQuantile=quantile(sensorData)
   #print(outQuantile)
   outIQR <- IQR(sensorData)
-  #print(outIQR)
+  #print(paste("IQR: ", outIQR))
   
   # Prepare result of the function
   myReturnList <- list ("cv" = coefVar, "shapiro" = shapiroValue, "ad" = adValue, 
                         "normality" = normalityAgreed, "bestDistFit" = bestFitName,
-                        "runs" = runsVal, "IQR" = outIQR)
+                        "runs" = runsVal, "ljungBox" = boxVal, "IQR" = outIQR)
   return(myReturnList)
 }
 
 # Main code of the process
-
+# t1 <- system.time({
 # Load the file with the data
-fullDataset <- read.csv(inputFile, sep = ",", header = TRUE)
+fullDataset <- read.csv(inputFile, sep = ";", header = TRUE)
 
 # Extract the data we are interested in and plot the full dataset
-sensorDataFull <- fullDataset[,5]
+sensorDataFull <- fullDataset[,2]
 plot(sensorDataFull, col="green", main="Full dataset")
 
 # Define the long data chunks with sliding windows of 50 steps
 numMetrics <- length(sensorDataFull)
 longWindowLength <- round (numMetrics*0.06, 0)
-referenceIndexesLong <- sample (longWindowLength:numMetrics,12,replace=F)
+referenceIndexesLong <- sample (longWindowLength:(numMetrics-50),12,replace=F)
 referenceIndexesLong
 
 # Set up the parallel environment PSOCK cluster, so it can be used in Windows and Linux
-defaultCores <- detectCores()-1
+defaultCores <- detectCores()-2
 defaultCores
 myCluster <- makeCluster(defaultCores, type = "PSOCK")
 myCluster
 registerDoParallel(cl=myCluster)
+# })
 
 # Iterate through the data chunks with long windows
-system.time({
+# t2 <- system.time({
   fullResultLong <- foreach (i=1:12, .combine = 'cbind', .packages=c("nortest", "randtests", "foreach", "fitdistrplus", "EnvStats")) %dopar% {
     currentIndex <- referenceIndexesLong[i]
     
@@ -176,7 +224,7 @@ system.time({
       initialIndex <- currentIndex+j-1-longWindowLength+j-1
       finalIndex <- currentIndex+j-1
       sensorDataChunk <- sensorDataFull [initialIndex:finalIndex] 
-      resultSlidingWindow <- variation_analysis(sensorDataChunk, 1, absoluteZero)
+      resultSlidingWindow <- variation_analysis(sensorDataChunk, j, absoluteZero)
       
       # Extract results for outcome preparation
       coefVar <- getElement(resultSlidingWindow, "cv")
@@ -185,24 +233,26 @@ system.time({
       normalityAgreed <- getElement(resultSlidingWindow, "normality")
       bestFitDistr <- getElement(resultSlidingWindow, "bestDistFit")
       runsVal <- getElement(resultSlidingWindow, "runs")
+      boxVal <- getElement(resultSlidingWindow, "ljungBox")
       outIQR <- getElement(resultSlidingWindow, "IQR")
       
       # Leave the results in a list, in memory, for combination with the other loops results
       myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex,
                                "cv" = coefVar, "shapiro" = shapiroVal, "ad" = adVal,
                                "normality" = normalityAgreed, "bestDistFit" = bestFitDistr,
-                               "runs" = runsVal, "IQR" = outIQR)
+                               "runs" = runsVal, "ljungBox" = boxVal, "IQR" = outIQR)
     }
     #partialResult
     
   }
-})
+# })
 
+# t3 <- system.time({
 stopImplicitCluster()
 
 # Save the results to a CSV file
 dfSave2 <- data.frame(matrix(unlist(fullResultLong[,1:600]), nrow=600, byrow=TRUE),stringsAsFactors=FALSE)
-colnames(dfSave2) <- c("initialIndex", "finalIndex", "cv", "shapiro", "ad", "normality", "bestDistFit", "runs", "IQR")
+colnames(dfSave2) <- c("initialIndex", "finalIndex", "cv", "shapiro", "ad", "normality", "bestDistFit", "runs", "ljungBox", "IQR")
 write.table(dfSave2, file="C:/PhD/variationProcessLong.csv", append= T, sep=',')
 
 # Generate a new set of resources for execution
@@ -211,12 +261,13 @@ myCluster
 registerDoParallel(cl=myCluster)
 
 # Define the short data chunks with sliding windows of 15 steps
-shortWindowLength <- round (numMetrics*0.025, 0)
+shortWindowLength <- round (numMetrics*0.01, 0)
 referenceIndexesShort <- sample (shortWindowLength:numMetrics,20,replace=F)
 referenceIndexesShort
+# })
 
 # Iterate through the data chunks with short windows
-system.time({
+# t4 <- system.time({
   fullResultShort <- foreach (i=1:20, .combine = 'cbind', .packages=c("nortest", "randtests", "foreach", "fitdistrplus", "EnvStats")) %dopar% {
     currentIndex <- referenceIndexesShort[i]
     
@@ -225,6 +276,9 @@ system.time({
       initialIndex <- currentIndex+j-1-shortWindowLength+j-1
       finalIndex <- currentIndex+j-1
       sensorDataChunk <- sensorDataFull [initialIndex:finalIndex] 
+      print(paste("Initial Index: ", initialIndex))
+      print(paste("Final Index: ", finalIndex))
+      print(sensorDataChunk)
       resultSlidingWindow <- variation_analysis(sensorDataChunk, i, absoluteZero)
       
       # Extract results for outcome preparation
@@ -234,26 +288,30 @@ system.time({
       normalityAgreed <- getElement(resultSlidingWindow, "normality")
       bestFitDistr <- getElement(resultSlidingWindow, "bestDistFit")
       runsVal <- getElement(resultSlidingWindow, "runs")
+      boxVal <- getElement(resultSlidingWindow, "ljungBox")
       outIQR <- getElement(resultSlidingWindow, "IQR")
       
       # Leave the results in a list, in memory, for combination with the other loops results
       myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex,
                                "cv" = coefVar, "shapiro" = shapiroVal, "ad" = adVal,
                                "normality" = normalityAgreed, "bestDistFit" = bestFitDistr,
-                               "runs" = runsVal, "IQR" = outIQR)
+                               "runs" = runsVal, "ljungBox" = boxVal, "IQR" = outIQR)
     }
     #partialResult
     
   }
-})
+# })
 
+# t5 <- system.time({
 # Stop the resources for parallelization
 stopImplicitCluster()
 
 # Save the results to a CSV file
 dfSave <- data.frame(matrix(unlist(fullResultShort[,1:300]), nrow=300, byrow=TRUE),stringsAsFactors=FALSE)
-colnames(dfSave) <- c("initialIndex", "finalIndex", "cv", "shapiro", "ad", "normality", "bestDistFit", "runs", "IQR")
+colnames(dfSave) <- c("initialIndex", "finalIndex", "cv", "shapiro", "ad", "normality", "bestDistFit", "runs", "ljungBox", "IQR")
 write.table(dfSave, file="C:/PhD/variationProcessShort.csv", append= T, sep=',')
+
+# })
 
 
 # Check normality of the full dataset with Anderson-Darling
