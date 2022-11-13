@@ -1,0 +1,31 @@
+> failureOriginalList
+ [1] 1 1 1 1 0 0 1 1 0 0 1 0 1 1 1 1 1 1 1 1
+> snhtFailureList
+ [1] 1 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+> pettittFailureList
+ [1] 1 1 1 1 0 1 0 0 0 0 1 0 0 0 1 1 1 0 0 0
+> buishandRFailureList
+ [1] 1 1 1 1 0 1 0 1 0 0 1 0 0 0 1 1 1 0 1 1
+> buishandUFailureList
+ [1] 1 1 1 1 0 1 0 1 0 0 1 0 0 0 1 1 1 0 1 1
+> lanzanteFailureList
+ [1] 1 1 0 0 0 0 0 0 0 0 1 0 0 0 1 1 1 0 0 0
+
+> predictedFailures
+ [1] 1 1 1 1 0 1 0 0 0 0 1 0 0 0 1 1 1 0 0 0
+>  
+> ConfusionMatrix(y_pred=predictedFailures, y_true=failureOriginalList)
+      y_pred
+y_true 0 1
+     0 4 1
+     1 7 8
+> Accuracy(y_pred=predictedFailures, y_true=failureOriginalList)
+[1] 0.6
+> Precision(y_pred=predictedFailures, y_true=failureOriginalList, positive = "1")
+[1] 0.8888889
+> Recall(y_pred=predictedFailures, y_true=failureOriginalList, positive = "1")
+[1] 0.5333333
+> FBeta_Score(y_pred=predictedFailures, y_true=failureOriginalList, positive = "1", beta=0.5)
+[1] 0.7843137
+> AUC(y_pred=predictedFailures, y_true=failureOriginalList)
+[1] 0.6666667

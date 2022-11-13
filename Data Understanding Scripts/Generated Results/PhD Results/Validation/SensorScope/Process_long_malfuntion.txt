@@ -1,0 +1,17 @@
+> predictedFailures <- c(0,0,0,0,1,0,0,0,1,1)
+> failureOriginalList <- c(0,1,0,1,1,0,0,1,1,1)
+> ConfusionMatrix(y_pred=predictedFailures, y_true=failureOriginalList)
+      y_pred
+y_true 0 1
+     0 4 0
+     1 3 3
+> Accuracy(y_pred=predictedFailures, y_true=failureOriginalList)
+[1] 0.7
+> Precision(y_pred=predictedFailures, y_true=failureOriginalList, positive = "1")
+[1] 1
+> Recall(y_pred=predictedFailures, y_true=failureOriginalList, positive = "1")
+[1] 0.5
+> FBeta_Score(y_pred=predictedFailures, y_true=failureOriginalList, positive = "1", beta=0.5)
+[1] 0.8333333
+> AUC(y_pred=predictedFailures, y_true=failureOriginalList)
+[1] 0.75
