@@ -1,5 +1,7 @@
 ########################################################################################
-## Script for automating the process of variation analysis
+## Script for integrating the outcomes from the variation process and outliers detection
+## to obtain a complete vision of the dataset analysis. Such information can be, later
+## on, combined in order to obtain an estimation of trustworthiness for a sensor.
 ## -------------------------------------------------------------------------------------
 ## Copyright (c) 2022 F. Javier Nieto. All rights reserved.
 ## This file is part of my PhD work.
@@ -26,6 +28,7 @@ library(EnvStats)
 library(nortest)
 library(trend)
 library(outliers)
+library(randtests)
 library(foreach)
 library(doParallel)
 library(ggpmisc)
@@ -154,7 +157,7 @@ turning_points_analysis <- function (testData) {
   return(myReturnList)
 }
 
-# Function that calculates all the tests --> So its execution can be parallelized
+# Function that calculates all the outliers tests --> So its execution can be parallelized
 outliers_analysis <- function (sensorData) {
   # First of all, if all values are equal, the tests fail -> Return error and all 0
   if (length(unique(sensorData))==1){
@@ -341,6 +344,44 @@ outliers_analysis <- function (sensorData) {
   return(myReturnList)
 }
 
+# Function that calculates all the variation tests --> So its execution can be parallelized
+variation_analysis <- function (sensorData) {
+  # First of all, if all values are equal, the tests fail -> Return error and all 0
+  if (length(unique(sensorData))==1){
+    print("Unique Value!")
+    myReturnList <- list ("cv" = 0, "runs" = 0, "numRuns" = 0, "ljungBox" = 0, "IQR" = 0)
+    return(myReturnList)
+  }
+  
+  # Check if we have random data
+  # Runs test with mean as reference (median can be used)
+  myThreshold <- mean(sensorData)
+  outRuns = runs.test(sensorData, threshold = myThreshold)
+  runsVal <- getElement(outRuns, "p.value")
+  numRunsVal <- getElement(outRuns, "runs")
+    
+  # Ljung-Box test (autocorrelation test that gives idea about white noise time-series)
+  outBox = Box.test(sensorData, lag = 1, type = "Ljung")
+  boxVal <- getElement(outBox, "p.value")
+  
+  # Calculate quartiles and IQR
+  # outQuantile=quantile(sensorData)
+  outIQR <- IQR(sensorData)
+  
+  # Calculate coefficient of variation, transforming the dataset if negative values are present
+  coefVar <- -100
+  minValue <- min(sensorData)
+  if (minValue<0) {
+    sensorData <- sensorData + abs(minValue)
+  }
+  coefVar <- cv(sensorData)
+  
+  # Prepare result of the function
+  myReturnList <- list ("cv" = coefVar, "runs" = runsVal, "numRuns" = numRunsVal,
+                        "ljungBox" = boxVal, "IQR" = outIQR)
+  return(myReturnList)
+}
+
 # Main code of the process
 
 # Load the file with the data
@@ -376,7 +417,8 @@ registerDoParallel(cl=myCluster)
 
 # Iterate through the data chunks with long windows
 t2 <- system.time({
-  fullResultLong <- foreach (i=1:10, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", "EnvStats", "ggpmisc")) %dopar% {
+  fullResultLong <- foreach (i=1:10, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", 
+                                                                     "EnvStats", "randtests", "ggpmisc")) %dopar% {
     currentIndex <- referenceIndexesLong[i]
     
     # Prepare the sliding windows (30 steps)
@@ -385,6 +427,7 @@ t2 <- system.time({
       finalIndex <- currentIndex+j-1
       sensorDataChunk <- sensorDataFull [initialIndex:finalIndex] 
       resultSlidingWindow <- outliers_analysis(sensorDataChunk)
+      resultVarSlidingWindow <- variation_analysis(sensorDataChunk)
       
       # Extract results for outcome preparation
       shapiroVal <- getElement(resultSlidingWindow, "shapiro")
@@ -410,6 +453,11 @@ t2 <- system.time({
       resAngleLanzante <- getElement(resultSlidingWindow, "angleLanzante")
       resAngleBR <- getElement(resultSlidingWindow, "angleBR") 
       resAngleBU <- getElement(resultSlidingWindow, "angleBU")
+      resCV <- getElement(resultVarSlidingWindow, "cv")
+      resRunsVal <- getElement(resultVarSlidingWindow, "runs")
+      resNumRuns <- getElement(resultVarSlidingWindow, "numRuns")
+      resLjung <- getElement(resultVarSlidingWindow, "ljungBox")
+      resIQR <- getElement(resultVarSlidingWindow, "IQR")
       
       # Check whether this sample contains error
       hasOriginalFailure <- 0
@@ -427,7 +475,9 @@ t2 <- system.time({
                                "lanzanteEDT" = lanzanteValEDT, "buishandREDT" = buishandRValEDT,
                                "buishandUEDT" = buishandUValEDT, "angleSNHT" = resAngleSNHT, 
                                "anglePettitt" = resAnglePettitt, "angleLanzante" = resAngleLanzante,
-                               "angleBR" = resAngleBR, "angleBU" = resAngleBU, "originalFailure" = hasOriginalFailure)
+                               "angleBR" = resAngleBR, "angleBU" = resAngleBU, "originalFailure" = hasOriginalFailure,
+                               "cv" = resCV, "runs" = resRunsVal, "numRuns" = resNumRuns, "ljungBox" = resLjung,
+                               "IQR" = resIQR)
     }
     #partialResult
     
@@ -442,8 +492,9 @@ dfSave <- data.frame(matrix(unlist(fullResultLong[,1:300]), nrow=300, byrow=TRUE
 colnames(dfSave) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers", 
                       "snht", "grubbs", "pettitt", "lanzante", "buishandU", "buishandRange", "grubbsEDT",
                       "snhtEDT", "pettittEDT", "lanzanteEDT", "buishandREDT", "buishandUEDT", "angleSNHT",
-                      "anglePettitt", "angleLanzante", "angleBR", "angleBU", "originalFailure")
-write.table(dfSave, file="C:/PhD/outliersProcessLong.csv", append= T, sep=',')
+                      "anglePettitt", "angleLanzante", "angleBR", "angleBU", "originalFailure", "cv", "runs",
+                      "numRuns", "ljungBox", "IQR")
+write.table(dfSave, file="C:/PhD/integratedProcessLong.csv", append= T, sep=',')
 
 # Generate a new set of resources for execution
 myCluster <- makeCluster(defaultCores, type = "PSOCK")
@@ -458,7 +509,8 @@ referenceIndexesShort
 
 # Iterate through the data chunks with short windows
 t4 <- system.time({
-  fullResultShort <- foreach (i=1:15, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", "EnvStats", "ggpmisc")) %dopar% {
+  fullResultShort <- foreach (i=1:15, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", 
+                                                                      "EnvStats", "randtests", "ggpmisc")) %dopar% {
     currentIndex <- referenceIndexesShort[i]
     print(currentIndex)
     # Prepare the sliding windows (15 steps)
@@ -467,6 +519,7 @@ t4 <- system.time({
       finalIndex <- currentIndex+j-1
       sensorDataChunk <- sensorDataFull [initialIndex:finalIndex] 
       resultSlidingWindow <- outliers_analysis(sensorDataChunk)
+      resultVarSlidingWindow <- variation_analysis(sensorDataChunk)
       
       # Extract results for outcome preparation
       shapiroVal <- getElement(resultSlidingWindow, "shapiro")
@@ -492,6 +545,11 @@ t4 <- system.time({
       resAngleLanzante <- getElement(resultSlidingWindow, "angleLanzante")
       resAngleBR <- getElement(resultSlidingWindow, "angleBR") 
       resAngleBU <- getElement(resultSlidingWindow, "angleBU")
+      resCV <- getElement(resultVarSlidingWindow, "cv")
+      resRunsVal <- getElement(resultVarSlidingWindow, "runs")
+      resNumRuns <- getElement(resultVarSlidingWindow, "numRuns")
+      resLjung <- getElement(resultVarSlidingWindow, "ljungBox")
+      resIQR <- getElement(resultVarSlidingWindow, "IQR")
       
       # Check whether this sample contains error
       hasOriginalFailure <- 0
@@ -509,7 +567,9 @@ t4 <- system.time({
                                "lanzanteEDT" = lanzanteValEDT, "buishandREDT" = buishandRValEDT,
                                "buishandUEDT" = buishandUValEDT, "angleSNHT" = resAngleSNHT, 
                                "anglePettitt" = resAnglePettitt, "angleLanzante" = resAngleLanzante,
-                               "angleBR" = resAngleBR, "angleBU" = resAngleBU, "originalFailure" = hasOriginalFailure)
+                               "angleBR" = resAngleBR, "angleBU" = resAngleBU, "originalFailure" = hasOriginalFailure,
+                               "cv" = resCV, "runs" = resRunsVal, "numRuns" = resNumRuns, "ljungBox" = resLjung,
+                               "IQR" = resIQR)
     }
     #partialResult
     
@@ -524,6 +584,7 @@ dfSave2 <- data.frame(matrix(unlist(fullResultShort[,1:225]), nrow=225, byrow=TR
 colnames(dfSave2) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers", 
                       "snht", "grubbs", "pettitt", "lanzante", "buishandU", "buishandRange", "grubbsEDT",
                       "snhtEDT", "pettittEDT", "lanzanteEDT", "buishandREDT", "buishandUEDT", "angleSNHT",
-                      "anglePettitt", "angleLanzante", "angleBR", "angleBU", "originalFailure")
-write.table(dfSave2, file="C:/PhD/outliersProcessShort.csv", append= T, sep=',')
+                      "anglePettitt", "angleLanzante", "angleBR", "angleBU", "originalFailure", "cv", "runs",
+                      "numRuns", "ljungBox", "IQR")
+write.table(dfSave2, file="C:/PhD/integratedProcessShort.csv", append= T, sep=',')
 })
