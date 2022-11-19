@@ -1,0 +1,27 @@
+Package: iotanomdet
+Title: Tools for Anomalies Detection and Trust Evaluation in IoT
+Version: 0.3.2.9000
+Authors@R: 
+    person("Francisco Javier", "Nieto", , "fj.nieto.es@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-8100-0939"))
+Description: The iotanomdet package implements several solutions and algorithms that analyse data of sensors in the 
+    IoT environment with the purpose of detecting anomalies and determining whether the data and the sensors can be
+    trusted. It provides some new transformations, a new way to analyse the outcomes from homogeneity tests and a 
+    couple of algorithms to analyse variability of the data and to detect outliers.
+License: Apache License (== 2)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.2
+Imports: 
+    doParallel,
+    EnvStats,
+    foreach,
+    ggpmisc,
+    nortest,
+    outliers,
+    randtests,
+    splus2R,
+    trend
+Depends: 
+    R (>= 2.10)
+LazyData: true

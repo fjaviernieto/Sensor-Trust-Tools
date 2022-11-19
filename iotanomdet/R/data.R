@@ -1,0 +1,26 @@
+#' Arduino station data
+#'
+#' Data obtained from an Arduino-made station with three sensors attached: a hygrometer, a temperature sensor and
+#' a humidity sensor. The dataset contains one week of data. It was located indoor and the hygrometer was located
+#' in a small flower pot. At some point, the sensors were 'vandalized' in order to generate anomalies in the data.
+#'
+#' @name arduino_station
+#'
+#' @docType data
+#'
+#' @author Francisco Javier Nieto \email{fj.nieto.es@gmail.com}
+#'
+#' @format ## `arduino_station`
+#' A data frame with 4,759 rows and 8 columns:
+#' \describe{
+#'   \item{time}{Timestamp of the metric obtained, in format YY-MM-DDThh:mm:ss}
+#'   \item{hygrometer}{Raw values provided by the hygrometer sensor}
+#'   \item{moisture}{Humidity of the soil calculated from the hygrometer measurement, in %}
+#'   \item{air_humidity}{Air humidity measured from the humidity sensor, in %}
+#'   \item{tempC}{Air temperature measured from the temperature sensor, in ºC}
+#'   \item{tempF}{Air temperature measured from the temperature sensor, in ºF}
+#'   \item{error}{Flag that indicates if there is an error in the data. 0 or 1}
+#'   \item{annotation}{Text that indicates if there was some external circumstance that may affect the dataset}
+#' }
+#' @references \url{https://www.mdpi.com/1424-8220/21/18/6063}
+"arduino_station"
