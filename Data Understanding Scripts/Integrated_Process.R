@@ -54,7 +54,7 @@ exp_diff <- function(inputData){
     # transform_result[i] <- abs(input_diff) * 1.2^(abs(input_diff) - 15)
     transform_result[i] <- input_diff * 1.1^(abs(input_diff) - 15)
   }
-  
+
   return(transform_result)
 }
 
@@ -67,7 +67,7 @@ poly_reg <- function(inputData){
   return(transform_result)
 }
 
-# Function that calculates all the angles in local maximum/minimum points 
+# Function that calculates all the angles in local maximum/minimum points
 turning_points_analysis <- function (testData) {
   # First of all, if all values are equal, the tests fail -> Return angle 0
   if (length(unique(testData))==1){
@@ -76,18 +76,18 @@ turning_points_analysis <- function (testData) {
                           "minPositions" = 0, "angles" = list(180))
     return(myReturnList)
   }
-  
+
   # Prepare the data in a dataframe
   x <- seq(1,length(testData))
   dataShow <- data.frame(
     x = x,
     y = testData
   )
-  
+
   # Plot local maximum and minimum
   ggplot(data = dataShow, aes(x=x, y=y)) + geom_line() + stat_peaks(span=5, strict=TRUE, col = "red") +
     stat_valleys(span=5, strict=TRUE, col = "blue")
-  
+
   # Extract max and min from the data and their position in the time series
   maximos <- ggpmisc:::find_peaks(dataShow$y, span=5)
   pos_max <- which(maximos==TRUE)
@@ -97,14 +97,14 @@ turning_points_analysis <- function (testData) {
   angles <- list()
   angles_conv <- list()
   num_max <- length(pos_max)
-  num_min <- length(pos_min) 
+  num_min <- length(pos_min)
   # fullResultList <- rep(list(), 7)
   index <- 1
-  
+
   # Prepare limits for the plots
   limMin <- min(dataShow$y) + (-20)
   limMax <- max(dataShow$y) + 20
-  
+
   # Calculate the slope taking as reference max/min and points nearby to create two lines
   for (i in positions){
     xref <- i
@@ -113,13 +113,13 @@ turning_points_analysis <- function (testData) {
     y1 <- dataShow$y[(i-1)]
     x2 <- i + 1
     y2 <- dataShow$y[(i+1)]
-    
+
     # Equations of the lines generated
-    m1 <- (yref - y1) / (xref - x1) 
+    m1 <- (yref - y1) / (xref - x1)
     n1 <- y1 - (((yref - y1)*x1)/(xref-x1))
     m2 <- (y2 - yref) / (x2 - xref)
     n2 <- yref - (((y2 - yref)*xref)/(x2-xref))
-    
+
     # Calculate angle
     # tanResult <- abs((m2 - m1) / (1 + m1 * m2))
     # tanResult <- (m2 - m1) / (1 + m1 * m2)
@@ -127,30 +127,30 @@ turning_points_analysis <- function (testData) {
     tanInput1 <- m2-m1
     tanInput2 <- 1 + m1 * m2
     angle <- atan2(tanInput1, tanInput2) * (180/pi)
-    
+
     # Plot the lines generated with the statistic
     plot_limit = c(0, limMax)
     if(yref<0){
       plot_limit = c(limMin, 0)
     }
-    #plot(x,(m1*x+n1),col='red', type='l', ylim = plot_limit) 
+    #plot(x,(m1*x+n1),col='red', type='l', ylim = plot_limit)
     #lines(x,(m2*x+n2),col='green')
     #lines(testData, col='blue', type='p')
-    
+
     # Add angle to the list
     angles[index] <- angle
     index <- index + 1
   }
-  
+
   # Transform the angles, taking into account if they come from local max or min
   if(num_max > 0) {
     angles_conv[1:num_max] <- (-180 - as.numeric(unlist(angles[1:num_max]))) * -1
   }
-  
+
   if(num_min > 0) {
     angles_conv[1+num_max:length(positions)] <- 180 - as.numeric(unlist(angles[1+num_max:length(positions)]))
   }
-  
+
   # Prepare result of the function
   myReturnList <- list ("numMax" = length(pos_max), "numMin" = length(pos_min), "maxPositions" = pos_max,
                         "minPositions" = pos_min, "angles" = angles_conv)
@@ -162,26 +162,26 @@ outliers_analysis <- function (sensorData) {
   # First of all, if all values are equal, the tests fail -> Return error and all 0
   if (length(unique(sensorData))==1){
     print("Unique Value!")
-    myReturnList <- list ("shapiro" = 1, "ad" = 1, 
+    myReturnList <- list ("shapiro" = 1, "ad" = 1,
                           "normality" = FALSE, "trend" = "none", "outliers" = TRUE,
-                          "snht" = 0, "grubbs" = 0, "pettitt" = 0, "lanzante" = 0, 
+                          "snht" = 0, "grubbs" = 0, "pettitt" = 0, "lanzante" = 0,
                           "buishandU" = 0, "buishandRange" = 0, "grubbsEDT" = 0,
                           "snhtEDT" = 0, "pettittEDT" = 0, "lanzanteEDT" = 0,
-                          "buishandREDT" = 0, "buishandUEDT" = 0, 
+                          "buishandREDT" = 0, "buishandUEDT" = 0,
                           "angleSNHT" = 1, "anglePettitt" = 1, "angleLanzante" = 1,
                           "angleBR" = 1, "angleBU" = 1)
     return(myReturnList)
   }
-  
-  # Remove NA and NAN values (or SNHT fails) --> Consider as outlier 
+
+  # Remove NA and NAN values (or SNHT fails) --> Consider as outlier
   sensorData[is.na(sensorData)] <- -99.99
   sensorData[is.nan(sensorData)] <- -99.99
   #plot(sensorData, col="green")
-  
+
   # Transform the data, ready to be used
   sensorDataEDT <- exp_diff(sensorData)
   sensorDataPRT <- poly_reg(sensorData)
-  
+
   # Check whether there is strong trend in the data or not
   outMk = mk.test(sensorData)
   #print(outMk)
@@ -189,7 +189,7 @@ outliers_analysis <- function (sensorData) {
   mkValue <- outMk$p.value
   isTrend <- FALSE
   dataTrend <- "none"
-  
+
   if (mkValue < 0.05) {
     # We identify the type of trend
     isTrend <- TRUE
@@ -198,15 +198,15 @@ outliers_analysis <- function (sensorData) {
       dataTrend <- "decrease"
     }
   }
-  
+
   # Check normality of the data with Shapiro-Wilk
   normalityTest1 <- shapiro.test(sensorData)
   #print(normalityTest1)
-  
+
   # Check normality of the data with Anderson-Darling
   normalityTest2 <- ad.test(sensorData)
   #print(normalityTest2)
-  
+
   dataDistribution <- "NORMAL"
   # Normality consensus and calculate mean and variance
   normalityAgreed <- TRUE
@@ -221,7 +221,7 @@ outliers_analysis <- function (sensorData) {
     normalityAgreed <- FALSE
   } else {
     #print("The tests reported the dataset is normal.")
-    
+
     # Calculate Buishand tests
     # Calculate Buishand R with original data (necessary for angles analysis)
     resBr <- br.test(sensorData, m=3000)
@@ -238,7 +238,7 @@ outliers_analysis <- function (sensorData) {
       resBr <- br.test(sensorDataPRT, m=3000)
     }
     buishandRangeVal <- getElement(resBr, "p.value")
-    
+
     # Calculate Buishand U with original data (necessary for angles analysis)
     resBu <- bu.test(sensorData, m=3000)
     #print(resBu)
@@ -255,7 +255,7 @@ outliers_analysis <- function (sensorData) {
     }
     buishandUVal <- getElement(resBu, "p.value")
   }
-  
+
   # Calculate SNHT and apply angles check
   # Calculate SNHT with original data (necessary for angles analysis)
   resSNHT <- snh.test(sensorData, 3000)
@@ -275,7 +275,7 @@ outliers_analysis <- function (sensorData) {
   }
   SNHTVal <- getElement(resSNHT, "p.value")
   SNHTValEDT <- getElement(resSNHTEDT, "p.value")
-  
+
   # Calculate Pettitt
   # Calculate Pettitt with original data (necessary for angles analysis)
   resPettitt <- pettitt.test(sensorData)
@@ -294,7 +294,7 @@ outliers_analysis <- function (sensorData) {
   }
   pettittVal <- getElement(resPettitt, "p.value")
   pettittValEDT <- getElement(resPettittEDT, "p.value")
-  
+
   # Calculate Lanzante
   # Calculate Lanzante with original data (necessary for angles analysis)
   resLanzante <- lanzante.test(sensorData)
@@ -313,32 +313,32 @@ outliers_analysis <- function (sensorData) {
   }
   lanzanteVal <- getElement(resLanzante, "p.value")
   lanzanteValEDT <- getElement(resLanzanteEDT, "p.value")
-  
+
   # Calculate Grubbs
   resGrubbs <- grubbs.test(sensorData)
   resGrubbsEDT <- grubbs.test(sensorDataEDT)
   #print(resGrubbs)
   grubbsVal <- getElement(resGrubbs, "p.value")
   grubbsValEDT <- getElement(resGrubbsEDT, "p.value")
-  
+
   # Calculate Rosner's ESD
   #resESD <- rosnerTest(sensorData, k=7)
   #print(resESD)
   #ESDVal <- resESD$n.outliers #It fails when no outliers are detected! --> TBD
-  
+
   # Check if any of them detected outliers
   detectedOutliers <- FALSE
   if (SNHTVal<0.05 | grubbsVal<0.05 | pettittVal<0.05 | lanzanteVal<0.05) {
     detectedOutliers <- TRUE
   }
-  
+
   # Prepare result of the function
-  myReturnList <- list ("shapiro" = normalityTest1$p.value, "ad" = normalityTest2$p.value, 
+  myReturnList <- list ("shapiro" = normalityTest1$p.value, "ad" = normalityTest2$p.value,
                         "normality" = normalityAgreed, "trend" = dataTrend, "outliers" = detectedOutliers,
-                        "snht" = SNHTVal, "grubbs" = grubbsVal, "pettitt" = pettittVal, "lanzante" = lanzanteVal, 
+                        "snht" = SNHTVal, "grubbs" = grubbsVal, "pettitt" = pettittVal, "lanzante" = lanzanteVal,
                         "buishandU" = buishandUVal, "buishandRange" = buishandRangeVal, "grubbsEDT" = grubbsValEDT,
                         "snhtEDT" = SNHTValEDT, "pettittEDT" = pettittValEDT, "lanzanteEDT" = lanzanteValEDT,
-                        "buishandREDT" = buishandRangeValEDT, "buishandUEDT" = buishandUValEDT, 
+                        "buishandREDT" = buishandRangeValEDT, "buishandUEDT" = buishandUValEDT,
                         "angleSNHT" = resAngleSNHT, "anglePettitt" = resAnglePettitt, "angleLanzante" = resAngleLanzante,
                         "angleBR" = resAngleBR, "angleBU" = resAngleBU)
   return(myReturnList)
@@ -352,22 +352,22 @@ variation_analysis <- function (sensorData) {
     myReturnList <- list ("cv" = 0, "runs" = 0, "numRuns" = 0, "ljungBox" = 0, "IQR" = 0)
     return(myReturnList)
   }
-  
+
   # Check if we have random data
   # Runs test with mean as reference (median can be used)
   myThreshold <- mean(sensorData)
   outRuns = runs.test(sensorData, threshold = myThreshold)
   runsVal <- getElement(outRuns, "p.value")
   numRunsVal <- getElement(outRuns, "runs")
-    
+
   # Ljung-Box test (autocorrelation test that gives idea about white noise time-series)
   outBox = Box.test(sensorData, lag = 1, type = "Ljung")
   boxVal <- getElement(outBox, "p.value")
-  
+
   # Calculate quartiles and IQR
   # outQuantile=quantile(sensorData)
   outIQR <- IQR(sensorData)
-  
+
   # Calculate coefficient of variation, transforming the dataset if negative values are present
   coefVar <- -100
   minValue <- min(sensorData)
@@ -375,7 +375,7 @@ variation_analysis <- function (sensorData) {
     sensorData <- sensorData + abs(minValue)
   }
   coefVar <- cv(sensorData)
-  
+
   # Prepare result of the function
   myReturnList <- list ("cv" = coefVar, "runs" = runsVal, "numRuns" = numRunsVal,
                         "ljungBox" = boxVal, "IQR" = outIQR)
@@ -417,18 +417,18 @@ registerDoParallel(cl=myCluster)
 
 # Iterate through the data chunks with long windows
 t2 <- system.time({
-  fullResultLong <- foreach (i=1:10, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", 
+  fullResultLong <- foreach (i=1:10, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers",
                                                                      "EnvStats", "randtests", "ggpmisc")) %dopar% {
     currentIndex <- referenceIndexesLong[i]
-    
+
     # Prepare the sliding windows (30 steps)
     partialResult <- foreach (j=1:30, .combine = 'cbind') %do% {
       initialIndex <- currentIndex+j-1-longWindowLength+j-1
       finalIndex <- currentIndex+j-1
-      sensorDataChunk <- sensorDataFull [initialIndex:finalIndex] 
+      sensorDataChunk <- sensorDataFull [initialIndex:finalIndex]
       resultSlidingWindow <- outliers_analysis(sensorDataChunk)
       resultVarSlidingWindow <- variation_analysis(sensorDataChunk)
-      
+
       # Extract results for outcome preparation
       shapiroVal <- getElement(resultSlidingWindow, "shapiro")
       adVal <- getElement(resultSlidingWindow, "ad")
@@ -443,58 +443,58 @@ t2 <- system.time({
       buishandRangeVal <- getElement(resultSlidingWindow, "buishandRange")
       #ESDVal <- getElement(resultSlidingWindow, "ESD")
       grubbsValEDT <- getElement(resultSlidingWindow, "grubbsEDT")
-      snhtValEDT <- getElement(resultSlidingWindow, "snhtEDT") 
-      pettittValEDT <- getElement(resultSlidingWindow, "pettittEDT") 
+      snhtValEDT <- getElement(resultSlidingWindow, "snhtEDT")
+      pettittValEDT <- getElement(resultSlidingWindow, "pettittEDT")
       lanzanteValEDT <- getElement(resultSlidingWindow, "lanzanteEDT")
-      buishandRValEDT <- getElement(resultSlidingWindow, "buishandREDT") 
-      buishandUValEDT <- getElement(resultSlidingWindow, "buishandUEDT") 
-      resAngleSNHT <- getElement(resultSlidingWindow, "angleSNHT") 
-      resAnglePettitt <- getElement(resultSlidingWindow, "anglePettitt") 
+      buishandRValEDT <- getElement(resultSlidingWindow, "buishandREDT")
+      buishandUValEDT <- getElement(resultSlidingWindow, "buishandUEDT")
+      resAngleSNHT <- getElement(resultSlidingWindow, "angleSNHT")
+      resAnglePettitt <- getElement(resultSlidingWindow, "anglePettitt")
       resAngleLanzante <- getElement(resultSlidingWindow, "angleLanzante")
-      resAngleBR <- getElement(resultSlidingWindow, "angleBR") 
+      resAngleBR <- getElement(resultSlidingWindow, "angleBR")
       resAngleBU <- getElement(resultSlidingWindow, "angleBU")
       resCV <- getElement(resultVarSlidingWindow, "cv")
       resRunsVal <- getElement(resultVarSlidingWindow, "runs")
       resNumRuns <- getElement(resultVarSlidingWindow, "numRuns")
       resLjung <- getElement(resultVarSlidingWindow, "ljungBox")
       resIQR <- getElement(resultVarSlidingWindow, "IQR")
-      
+
       # Check whether this sample contains error
       hasOriginalFailure <- 0
       if (any(1<=failureData[initialIndex:finalIndex])){
         hasOriginalFailure <- 1
       }
-      
+
       # Leave the results in a list, in memory, for combination with the other loops results
-      myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex, 
-                               "shapiro" = shapiroVal, "ad" = adVal, "normality" = normalityAgreed, 
-                               "trend" = dataTrend, "outliers" = detectedOutliers, "snht" = SNHTVal, 
-                               "grubbs" = grubbsVal, "pettitt" = pettittVal, "lanzante" = lanzanteVal, 
-                               "buishandU" = buishandUVal, "buishandRange" = buishandRangeVal, 
-                               "grubbsEDT" = grubbsValEDT, "snhtEDT" = snhtValEDT, "pettittEDT" = pettittValEDT, 
+      myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex,
+                               "shapiro" = shapiroVal, "ad" = adVal, "normality" = normalityAgreed,
+                               "trend" = dataTrend, "outliers" = detectedOutliers, "snht" = SNHTVal,
+                               "grubbs" = grubbsVal, "pettitt" = pettittVal, "lanzante" = lanzanteVal,
+                               "buishandU" = buishandUVal, "buishandRange" = buishandRangeVal,
+                               "grubbsEDT" = grubbsValEDT, "snhtEDT" = snhtValEDT, "pettittEDT" = pettittValEDT,
                                "lanzanteEDT" = lanzanteValEDT, "buishandREDT" = buishandRValEDT,
-                               "buishandUEDT" = buishandUValEDT, "angleSNHT" = resAngleSNHT, 
+                               "buishandUEDT" = buishandUValEDT, "angleSNHT" = resAngleSNHT,
                                "anglePettitt" = resAnglePettitt, "angleLanzante" = resAngleLanzante,
                                "angleBR" = resAngleBR, "angleBU" = resAngleBU, "originalFailure" = hasOriginalFailure,
                                "cv" = resCV, "runs" = resRunsVal, "numRuns" = resNumRuns, "ljungBox" = resLjung,
                                "IQR" = resIQR)
     }
     #partialResult
-    
+
   }
 })
 
 t3 <- system.time({
-stopImplicitCluster()
+stopCluster(myCluster)
 
 # Save the results to a CSV file
 dfSave <- data.frame(matrix(unlist(fullResultLong[,1:300]), nrow=300, byrow=TRUE),stringsAsFactors=FALSE)
-colnames(dfSave) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers", 
+colnames(dfSave) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers",
                       "snht", "grubbs", "pettitt", "lanzante", "buishandU", "buishandRange", "grubbsEDT",
                       "snhtEDT", "pettittEDT", "lanzanteEDT", "buishandREDT", "buishandUEDT", "angleSNHT",
                       "anglePettitt", "angleLanzante", "angleBR", "angleBU", "originalFailure", "cv", "runs",
                       "numRuns", "ljungBox", "IQR")
-write.table(dfSave, file="C:/PhD/integratedProcessLong.csv", append= T, sep=',')
+write.table(dfSave, file="C:/PhD/integratedProcessLong.csv", append= T, sep=',', row.names = FALSE)
 
 # Generate a new set of resources for execution
 myCluster <- makeCluster(defaultCores, type = "PSOCK")
@@ -509,7 +509,7 @@ referenceIndexesShort
 
 # Iterate through the data chunks with short windows
 t4 <- system.time({
-  fullResultShort <- foreach (i=1:15, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers", 
+  fullResultShort <- foreach (i=1:15, .combine = 'cbind', .packages=c("nortest", "foreach", "trend", "outliers",
                                                                       "EnvStats", "randtests", "ggpmisc")) %dopar% {
     currentIndex <- referenceIndexesShort[i]
     print(currentIndex)
@@ -517,10 +517,10 @@ t4 <- system.time({
     partialResult <- foreach (j=1:15, .combine = 'cbind') %do% {
       initialIndex <- currentIndex+j-1-shortWindowLength+j-1
       finalIndex <- currentIndex+j-1
-      sensorDataChunk <- sensorDataFull [initialIndex:finalIndex] 
+      sensorDataChunk <- sensorDataFull [initialIndex:finalIndex]
       resultSlidingWindow <- outliers_analysis(sensorDataChunk)
       resultVarSlidingWindow <- variation_analysis(sensorDataChunk)
-      
+
       # Extract results for outcome preparation
       shapiroVal <- getElement(resultSlidingWindow, "shapiro")
       adVal <- getElement(resultSlidingWindow, "ad")
@@ -535,56 +535,56 @@ t4 <- system.time({
       buishandRangeVal <- getElement(resultSlidingWindow, "buishandRange")
       #ESDVal <- getElement(resultSlidingWindow, "ESD")
       grubbsValEDT <- getElement(resultSlidingWindow, "grubbsEDT")
-      snhtValEDT <- getElement(resultSlidingWindow, "snhtEDT") 
-      pettittValEDT <- getElement(resultSlidingWindow, "pettittEDT") 
+      snhtValEDT <- getElement(resultSlidingWindow, "snhtEDT")
+      pettittValEDT <- getElement(resultSlidingWindow, "pettittEDT")
       lanzanteValEDT <- getElement(resultSlidingWindow, "lanzanteEDT")
-      buishandRValEDT <- getElement(resultSlidingWindow, "buishandREDT") 
-      buishandUValEDT <- getElement(resultSlidingWindow, "buishandUEDT") 
-      resAngleSNHT <- getElement(resultSlidingWindow, "angleSNHT") 
-      resAnglePettitt <- getElement(resultSlidingWindow, "anglePettitt") 
+      buishandRValEDT <- getElement(resultSlidingWindow, "buishandREDT")
+      buishandUValEDT <- getElement(resultSlidingWindow, "buishandUEDT")
+      resAngleSNHT <- getElement(resultSlidingWindow, "angleSNHT")
+      resAnglePettitt <- getElement(resultSlidingWindow, "anglePettitt")
       resAngleLanzante <- getElement(resultSlidingWindow, "angleLanzante")
-      resAngleBR <- getElement(resultSlidingWindow, "angleBR") 
+      resAngleBR <- getElement(resultSlidingWindow, "angleBR")
       resAngleBU <- getElement(resultSlidingWindow, "angleBU")
       resCV <- getElement(resultVarSlidingWindow, "cv")
       resRunsVal <- getElement(resultVarSlidingWindow, "runs")
       resNumRuns <- getElement(resultVarSlidingWindow, "numRuns")
       resLjung <- getElement(resultVarSlidingWindow, "ljungBox")
       resIQR <- getElement(resultVarSlidingWindow, "IQR")
-      
+
       # Check whether this sample contains error
       hasOriginalFailure <- 0
       if (any(1<=failureData[initialIndex:finalIndex])){
         hasOriginalFailure <- 1
       }
-      
+
       # Leave the results in a list, in memory, for combination with the other loops results
-      myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex, 
-                               "shapiro" = shapiroVal, "ad" = adVal, "normality" = normalityAgreed, 
-                               "trend" = dataTrend, "outliers" = detectedOutliers, "snht" = SNHTVal, 
-                               "grubbs" = grubbsVal, "pettitt" = pettittVal, "lanzante" = lanzanteVal, 
+      myFullReturnList <- list("initialIndex" = initialIndex, "finalIndex" = finalIndex,
+                               "shapiro" = shapiroVal, "ad" = adVal, "normality" = normalityAgreed,
+                               "trend" = dataTrend, "outliers" = detectedOutliers, "snht" = SNHTVal,
+                               "grubbs" = grubbsVal, "pettitt" = pettittVal, "lanzante" = lanzanteVal,
                                "buishandU" = buishandUVal, "buishandRange" = buishandRangeVal,
-                               "grubbsEDT" = grubbsValEDT, "snhtEDT" = snhtValEDT, "pettittEDT" = pettittValEDT, 
+                               "grubbsEDT" = grubbsValEDT, "snhtEDT" = snhtValEDT, "pettittEDT" = pettittValEDT,
                                "lanzanteEDT" = lanzanteValEDT, "buishandREDT" = buishandRValEDT,
-                               "buishandUEDT" = buishandUValEDT, "angleSNHT" = resAngleSNHT, 
+                               "buishandUEDT" = buishandUValEDT, "angleSNHT" = resAngleSNHT,
                                "anglePettitt" = resAnglePettitt, "angleLanzante" = resAngleLanzante,
                                "angleBR" = resAngleBR, "angleBU" = resAngleBU, "originalFailure" = hasOriginalFailure,
                                "cv" = resCV, "runs" = resRunsVal, "numRuns" = resNumRuns, "ljungBox" = resLjung,
                                "IQR" = resIQR)
     }
     #partialResult
-    
+
   }
 })
 
 t5 <- system.time({
-stopImplicitCluster()
+stopCluster(myCluster)
 
 # Save the results to a CSV file
 dfSave2 <- data.frame(matrix(unlist(fullResultShort[,1:225]), nrow=225, byrow=TRUE),stringsAsFactors=FALSE)
-colnames(dfSave2) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers", 
+colnames(dfSave2) <- c("initialIndex", "finalIndex", "shapiro", "ad", "normality", "trend", "outliers",
                       "snht", "grubbs", "pettitt", "lanzante", "buishandU", "buishandRange", "grubbsEDT",
                       "snhtEDT", "pettittEDT", "lanzanteEDT", "buishandREDT", "buishandUEDT", "angleSNHT",
                       "anglePettitt", "angleLanzante", "angleBR", "angleBU", "originalFailure", "cv", "runs",
                       "numRuns", "ljungBox", "IQR")
-write.table(dfSave2, file="C:/PhD/integratedProcessShort.csv", append= T, sep=',')
+write.table(dfSave2, file="C:/PhD/integratedProcessShort.csv", append= T, sep=',', row.names = FALSE)
 })
